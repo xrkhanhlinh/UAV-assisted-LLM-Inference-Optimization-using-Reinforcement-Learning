@@ -1,171 +1,140 @@
 # UAV-assisted LLM Inference Optimization using PPO
 
-## 1. Project Overview
+## 1. Giới thiệu
 
-This project studies the optimization of a UAV-assisted Large Language Model (LLM) inference system using reinforcement learning. In the considered system, an Unmanned Aerial Vehicle (UAV) acts as an aerial relay to support communication between ground users and an edge server that provides LLM inference services.
+Dự án này nghiên cứu bài toán tối ưu hóa hệ thống UAV hỗ trợ suy luận mô hình ngôn ngữ lớn, trong đó UAV đóng vai trò là thiết bị relay trên không nhằm hỗ trợ truyền dữ liệu giữa người dùng mặt đất và máy chủ biên.
 
-The main goal is to optimize the UAV control policy and system configuration in order to reduce latency, improve service quality, reduce energy consumption, and satisfy system constraints.
+Trong các khu vực có hạ tầng mạng yếu, không ổn định hoặc khó triển khai trạm gốc cố định, người dùng có thể gặp độ trễ cao khi sử dụng các dịch vụ trí tuệ nhân tạo, đặc biệt là các dịch vụ dựa trên mô hình ngôn ngữ lớn. UAV có thể được sử dụng để cải thiện chất lượng kết nối bằng cách bay đến vị trí phù hợp hơn, từ đó cải thiện chất lượng kênh truyền và giảm độ trễ truyền dữ liệu.
 
-The optimization problem is formulated as a reinforcement learning problem. A custom Gymnasium environment is developed, and the Proximal Policy Optimization (PPO) algorithm is used to learn an adaptive control policy.
+Bài toán trong dự án được mô hình hóa dưới dạng một bài toán học tăng cường. Thuật toán Proximal Policy Optimization được sử dụng để học chính sách điều khiển UAV và lựa chọn cấu hình hệ thống nhằm tối ưu hiệu năng tổng thể.
 
----
-
-## 2. Motivation
-
-Large Language Models require large computation and communication resources. When users access LLM services in areas with weak communication infrastructure, the system may suffer from high transmission delay, unstable connection quality, and poor service performance.
-
-UAV-assisted communication can improve coverage and communication quality by placing an aerial relay closer to users. However, UAVs have limited battery capacity and cannot move arbitrarily without considering energy consumption and physical constraints.
-
-Therefore, this project investigates how reinforcement learning can be used to optimize UAV movement, communication quality, LLM configuration, and system constraints at the same time.
+Mục tiêu chính của hệ thống là giảm tổng chi phí vận hành, bao gồm độ trễ, năng lượng tiêu thụ, chất lượng suy luận LLM và mức độ vi phạm các ràng buộc hệ thống.
 
 ---
 
-## 3. Main Objectives
+## 2. Mục tiêu của dự án
 
-The main objectives of this project are:
+Dự án hướng tới các mục tiêu chính sau:
 
-1. Build a simulation environment for UAV-assisted LLM inference systems.
-2. Model the relationship between UAV position, channel quality, latency, energy consumption, and LLM service quality.
-3. Formulate the optimization problem as a reinforcement learning task.
-4. Design a Gymnasium-compatible environment for PPO training.
-5. Apply PPO to learn a control policy for UAV movement and system configuration.
-6. Evaluate PPO using reward, latency, PPL, energy consumption, feasible rate, and constraint violation.
-7. Compare PPO with baseline policies such as Random Policy, Hover Policy, and Greedy Policy.
+- Xây dựng mô hình hệ thống UAV hỗ trợ suy luận LLM.
+- Thiết kế môi trường học tăng cường theo chuẩn Gymnasium.
+- Mô hình hóa các thành phần chính gồm người dùng, UAV, kênh truyền, edge server, tác vụ LLM và năng lượng UAV.
+- Áp dụng thuật toán PPO để học chính sách điều khiển UAV.
+- Tối ưu đồng thời nhiều yếu tố như vị trí UAV, độ trễ, chất lượng LLM, năng lượng tiêu thụ và ràng buộc hệ thống.
+- Đánh giá kết quả thông qua các chỉ số reward, latency, PPL, energy consumption, feasible rate và constraint violation.
+- So sánh PPO với một số chính sách baseline như Random Policy, Hover Policy và Greedy Policy.
 
 ---
 
-## 4. System Model
+## 3. Bối cảnh bài toán
 
-The system consists of four main components:
+Các dịch vụ LLM yêu cầu tài nguyên tính toán lớn và thường cần kết nối ổn định giữa người dùng và hệ thống xử lý. Trong các khu vực có điều kiện mạng hạn chế, việc truyền dữ liệu từ người dùng đến máy chủ biên có thể gặp các vấn đề như:
 
-1. Ground users.
+- Chất lượng kênh truyền thấp.
+- Độ trễ truyền dữ liệu cao.
+- Kết nối không ổn định.
+- Khó đảm bảo chất lượng dịch vụ.
+- Khó triển khai hạ tầng mạng cố định.
+
+UAV có thể hỗ trợ bằng cách đóng vai trò relay trên không. Tuy nhiên, UAV cũng có các giới hạn riêng:
+
+- Dung lượng pin có hạn.
+- Không thể di chuyển tùy ý với tốc độ quá lớn.
+- Cần duy trì trong vùng hoạt động hợp lệ.
+- Cần cân bằng giữa di chuyển, truyền thông và năng lượng.
+- Cần lựa chọn cấu hình xử lý LLM phù hợp để không làm tăng độ trễ quá mức.
+
+Vì vậy, bài toán cần một phương pháp tối ưu có khả năng ra quyết định tuần tự theo thời gian. Học tăng cường, đặc biệt là PPO, là một hướng tiếp cận phù hợp cho bài toán này.
+
+---
+
+## 4. Mô tả hệ thống
+
+Hệ thống nghiên cứu gồm các thành phần chính:
+
+1. Người dùng mặt đất.
 2. UAV relay.
 3. Edge server.
-4. Energy system.
-
-### 4.1 Ground Users
-
-Ground users generate LLM inference requests. Each user request may include an input prompt and expects an output response from the LLM system.
-
-In the simulation, each task may be represented by:
-
-- Number of input tokens.
-- Input data size.
-- Number of output tokens.
-- Output data size.
-- Latency requirement.
-- Service quality requirement.
-
-The positions of users are randomly generated within a predefined service area.
+4. Tác vụ suy luận LLM.
+5. Mô hình kênh truyền.
+6. Mô hình năng lượng UAV.
+7. Môi trường học tăng cường.
 
 ---
 
-### 4.2 UAV Relay
+## 5. Người dùng mặt đất
 
-The UAV acts as an aerial relay between ground users and the edge server. The UAV can move in the horizontal plane while maintaining a fixed altitude.
+Người dùng mặt đất phát sinh các yêu cầu suy luận LLM. Mỗi yêu cầu có thể bao gồm prompt đầu vào và kết quả đầu ra mong muốn.
 
-The UAV state includes:
+Trong mô phỏng, mỗi tác vụ LLM có thể được mô tả bằng các đại lượng sau:
 
-- UAV position.
-- UAV velocity.
-- Remaining energy.
-- Distance to users.
-- Channel quality.
-- Current time slot.
-- System constraint status.
+| Thành phần | Ý nghĩa |
+|---|---|
+| Input tokens | Số token đầu vào của prompt |
+| Input data size | Kích thước dữ liệu đầu vào |
+| Output tokens | Số token đầu ra dự kiến |
+| Output data size | Kích thước dữ liệu đầu ra |
+| Latency requirement | Yêu cầu về độ trễ |
+| Quality requirement | Yêu cầu về chất lượng suy luận |
 
-The UAV needs to decide how to move and how to configure the system in order to improve the overall service performance.
-
----
-
-### 4.3 Edge Server
-
-The edge server performs LLM inference tasks. The processing latency depends on:
-
-- Input token size.
-- Output token size.
-- Selected LLM configuration.
-- Available computing resource.
-- Model complexity.
-
-In this project, the LLM inference process is simplified to make the problem suitable for simulation and reinforcement learning training.
+Vị trí người dùng được sinh ngẫu nhiên trong một vùng không gian xác định. UAV cần học cách điều chỉnh vị trí để phục vụ người dùng hiệu quả hơn.
 
 ---
 
-### 4.4 Energy System
+## 6. UAV relay
 
-The UAV consumes energy during movement and operation. The remaining energy must stay above a minimum threshold to ensure safe operation.
+UAV đóng vai trò relay để hỗ trợ truyền dữ liệu giữa người dùng và edge server. UAV có thể thay đổi vị trí trong không gian nhằm cải thiện chất lượng kênh truyền.
 
-The current implementation mainly considers UAV energy consumption. If the code does not explicitly calculate harvested laser energy, laser charging should be treated as a future extension rather than a completed implementation.
+Các trạng thái quan trọng của UAV gồm:
 
----
+| Thành phần | Ý nghĩa |
+|---|---|
+| UAV position | Vị trí UAV trong vùng hoạt động |
+| UAV velocity | Vận tốc bay của UAV |
+| UAV energy | Năng lượng còn lại của UAV |
+| Channel gain | Chất lượng kênh truyền |
+| Distance to users | Khoảng cách từ UAV đến người dùng |
+| Constraint status | Trạng thái vi phạm ràng buộc |
 
-## 5. Reinforcement Learning Formulation
-
-The UAV-assisted LLM inference problem is formulated as a Markov Decision Process.
-
-At each time slot:
-
-1. The environment provides the current system state.
-2. The PPO agent selects an action.
-3. The UAV updates its position and system configuration.
-4. The environment calculates channel quality, latency, PPL, energy consumption, and constraint violation.
-5. A reward is returned to the agent.
-6. The next state is generated.
-
-The goal of the agent is to maximize the cumulative reward over an episode.
-
-Since the reward is defined based on negative system cost and penalty, maximizing reward is equivalent to minimizing the total system cost.
+Nhiệm vụ của UAV không chỉ là bay gần người dùng nhất, mà còn phải cân bằng giữa chất lượng truyền thông, độ trễ, năng lượng và ràng buộc hệ thống.
 
 ---
 
-## 6. Environment Design
+## 7. Edge server và suy luận LLM
 
-The environment is implemented using Gymnasium.
+Edge server thực hiện xử lý các yêu cầu suy luận LLM. Độ trễ xử lý phụ thuộc vào:
 
-A typical environment class has the following structure:
+- Số token đầu vào.
+- Số token đầu ra.
+- Cấu hình mô hình LLM.
+- Tài nguyên tính toán.
+- Độ phức tạp của mô hình.
+
+Trong dự án này, mô hình LLM được mô phỏng ở mức đơn giản. Thay vì chạy một mô hình LLM thật, hệ thống sử dụng các công thức mô phỏng để ước lượng độ trễ xử lý và chất lượng đầu ra.
+
+Một chỉ số được sử dụng để đại diện cho chất lượng LLM là PPL. PPL càng thấp thì chất lượng mô hình càng tốt. Tuy nhiên, để giảm PPL thường cần sử dụng cấu hình mô hình lớn hơn, dẫn đến độ trễ xử lý cao hơn.
+
+Do đó, bài toán có sự đánh đổi giữa:
+
+- Chất lượng LLM.
+- Độ trễ xử lý.
+- Tài nguyên tính toán.
+- Chi phí hệ thống.
+
+---
+
+## 8. Mô hình kênh truyền
+
+Chất lượng kênh truyền phụ thuộc vào khoảng cách giữa UAV và người dùng. Khi UAV ở gần người dùng hơn, kênh truyền thường tốt hơn, tốc độ truyền dữ liệu cao hơn và độ trễ truyền dữ liệu thấp hơn.
+
+Khoảng cách giữa UAV và người dùng có thể được tính như sau:
 
 ```python
-import gymnasium as gym
-from gymnasium import spaces
-import numpy as np
+def compute_distance(uav_pos, user_pos, uav_altitude):
+    dx = uav_pos[0] - user_pos[0]
+    dy = uav_pos[1] - user_pos[1]
+    dz = uav_altitude
 
+    distance = np.sqrt(dx**2 + dy**2 + dz**2)
 
-class UAVLLMEnv(gym.Env):
-    def __init__(self, n_users=10, seed=None):
-        super().__init__()
-
-        self.n_users = n_users
-        self.rng = np.random.default_rng(seed)
-
-        self.observation_space = spaces.Box(
-            low=0.0,
-            high=1.0,
-            shape=(9,),
-            dtype=np.float32
-        )
-
-        self.action_space = spaces.Box(
-            low=-1.0,
-            high=1.0,
-            shape=(6,),
-            dtype=np.float32
-        )
-
-        self._init_episode()
-
-    def _init_episode(self):
-        pass
-
-    def reset(self, seed=None, options=None):
-        super().reset(seed=seed)
-        self._init_episode()
-        obs = self._get_obs()
-        info = {}
-        return obs, info
-
-    def step(self, action):
-        pass
-
-    def _get_obs(self):
-        pass
+    return distance
